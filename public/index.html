@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>IMDb Poster Extractor</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero" aria-labelledby="title">
+        <div>
+          <p class="eyebrow">IMDb poster utility</p>
+          <h1 id="title">Extract IMDb poster URLs from your browser.</h1>
+          <p class="lede">Use the bookmarklet on an IMDb title page, or paste an IMDb URL for the server fallback. Reupload to Imgbox is free and runs through the server.</p>
+        </div>
+      </section>
+
+      <section class="tool" aria-label="Poster extractor">
+        <div class="bookmarklet">
+          <div>
+            <p class="bookmarklet-title">Browser extractor</p>
+            <p>Drag this button to your bookmarks bar, open an IMDb title page, then click it.</p>
+          </div>
+          <a id="bookmarklet-link" href="#">Grab IMDb Poster</a>
+        </div>
+
+        <form id="poster-form" class="form">
+          <label for="imdb-input">IMDb URL or title ID server fallback</label>
+          <div class="input-row">
+            <input id="imdb-input" name="input" type="text" spellcheck="false" placeholder="https://www.imdb.com/title/tt0111161/">
+            <button type="submit">Extract</button>
+          </div>
+          <label class="check">
+            <input id="upload-check" type="checkbox">
+            <span>Reupload automatically to Imgbox</span>
+          </label>
+        </form>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+
+        <article id="result" class="result" hidden>
+          <div class="poster-frame">
+            <img id="poster-preview" alt="">
+          </div>
+
+          <div class="result-details">
+            <p id="movie-title" class="movie-title"></p>
+            <p id="source" class="source"></p>
+
+            <label for="poster-url">Original poster URL</label>
+            <div class="copy-row">
+              <input id="poster-url" readonly>
+              <button id="copy-poster" type="button">Copy</button>
+            </div>
+            <button id="upload-current" class="secondary" type="button">Upload to Imgbox</button>
+
+            <div id="upload-result" hidden>
+              <label for="uploaded-url">Uploaded URL</label>
+              <div class="copy-row">
+                <input id="uploaded-url" readonly>
+                <button id="copy-uploaded" type="button">Copy</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
