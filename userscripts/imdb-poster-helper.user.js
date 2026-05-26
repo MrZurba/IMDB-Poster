@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IMDb Poster Helper
 // @namespace    poster-extractor.local
-// @version      1.0.6
+// @version      1.0.7
 // @description  Copy or open the poster image URL from IMDb title pages.
 // @match        https://www.imdb.com/*
 // @match        https://m.imdb.com/*
@@ -49,7 +49,7 @@
 
     panel.id = "imdb-poster-helper-panel";
     panel.innerHTML = ""
-      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.0.6</div>'
+      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.0.7</div>'
       + '<button data-action="copy" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Copy URL</button>'
       + '<button data-action="open" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Open Poster</button>'
       + '<button data-action="first" style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Use First Image</button>'
@@ -130,7 +130,51 @@
   }
 
   function extractPosterUrl() {
-    return cleanImageUrl(extractFirstAmazonImage() || extractFromVisiblePoster() || extractFromJsonLd() || extractFromMeta() || extractFromPageHtml());
+    return cleanImageUrl(extractHeroPosterByPosition() || extractFromVisiblePoster() || extractFromJsonLd() || extractFromMeta() || extractFromPageHtml());
+  }
+
+  function extractHeroPosterByPosition() {
+    var images = document.querySelectorAll("img");
+    var bestUrl = "";
+    var bestScore = -1;
+    var i;
+
+    for (i = 0; i < images.length; i += 1) {
+      var src = bestImageFromElement(images[i]);
+      var rect = images[i].getBoundingClientRect();
+      var width = rect.width || images[i].width || 0;
+      var height = rect.height || images[i].height || 0;
+      var score = 0;
+
+      if (!src || src.indexOf("m.media-amazon.com/images/M/") === -1) {
+        continue;
+      }
+
+      if (width < 70 || height < 110) {
+        continue;
+      }
+
+      if (height <= width) {
+        continue;
+      }
+
+      // Main IMDb posters sit high in the hero area. Gallery photos are usually much lower.
+      if (rect.top > 520) {
+        continue;
+      }
+
+      score += 1000 - Math.max(0, rect.top);
+      score += Math.min(height, 420);
+      score += height > width * 1.25 ? 180 : 0;
+      score += rect.left < window.innerWidth * 0.45 ? 160 : 0;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestUrl = src;
+      }
+    }
+
+    return bestUrl;
   }
 
   function extractFirstAmazonImage() {
