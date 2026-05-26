@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IMDb Poster to Imgbox
 // @namespace    https://github.com/MrZurba/poster-extractor
-// @version      1.0.1
+// @version      1.0.2
 // @description  Extract IMDb poster URLs and optionally upload them to Imgbox.
 // @author       MrZurba
 // @match        https://www.imdb.com/title/tt*
@@ -85,7 +85,7 @@
       try {
         const data = JSON.parse(script.textContent.trim());
         const item = Array.isArray(data) ? data.find((entry) => entry && entry.image) : data;
-        const image = Array.isArray(item?.image) ? item.image[0] : item?.image;
+        const image = item && Array.isArray(item.image) ? item.image[0] : item && item.image;
 
         if (typeof image === "string") {
           return {
@@ -93,7 +93,7 @@
             title: typeof item.name === "string" ? item.name : ""
           };
         }
-      } catch {
+      } catch (error) {
         continue;
       }
     }
@@ -102,7 +102,8 @@
   }
 
   function getMetaContent(selector) {
-    return document.querySelector(selector)?.content || "";
+    const element = document.querySelector(selector);
+    return element ? element.content : "";
   }
 
   function cleanImdbImageUrl(url) {
@@ -247,7 +248,7 @@
       data: form,
       responseType: "json"
     });
-    const file = response.response?.files?.[0];
+    const file = response.response && response.response.files && response.response.files[0];
 
     if (!file) {
       throw new Error("Imgbox did not return an uploaded file.");
@@ -266,9 +267,10 @@
       responseType: "text"
     });
     const html = response.responseText || "";
-    const csrfToken = html.match(/name=["']authenticity_token["'][^>]+value=["']([^"']+)["']/i)?.[1]
-      || html.match(/value=["']([^"']+)["'][^>]+name=["']authenticity_token["']/i)?.[1]
-      || html.match(/<meta[^>]+name=["']csrf-token["'][^>]+content=["']([^"']+)["']/i)?.[1];
+    const tokenMatch = html.match(/name=["']authenticity_token["'][^>]+value=["']([^"']+)["']/i)
+      || html.match(/value=["']([^"']+)["'][^>]+name=["']authenticity_token["']/i)
+      || html.match(/<meta[^>]+name=["']csrf-token["'][^>]+content=["']([^"']+)["']/i);
+    const csrfToken = tokenMatch && tokenMatch[1];
 
     if (!csrfToken) {
       throw new Error("Could not start an Imgbox session.");
@@ -292,7 +294,7 @@
     });
     const token = response.response;
 
-    if (!token?.token_id || !token?.token_secret) {
+    if (!token || !token.token_id || !token.token_secret) {
       throw new Error("Could not create an Imgbox upload token.");
     }
 
@@ -305,7 +307,7 @@
       url: imageUrl,
       responseType: "blob"
     });
-    const contentType = response.response?.type || "image/jpeg";
+    const contentType = response.response && response.response.type ? response.response.type : "image/jpeg";
     const extension = contentType.includes("png") ? "png" : contentType.includes("gif") ? "gif" : "jpg";
 
     return {
@@ -316,8 +318,7 @@
 
   function gmRequest(options) {
     return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        ...options,
+      const requestOptions = Object.assign({}, options, {
         onload: (response) => {
           if (response.status >= 200 && response.status < 300) {
             resolve(response);
@@ -329,6 +330,8 @@
         onerror: () => reject(new Error("Network request failed.")),
         ontimeout: () => reject(new Error("Network request timed out."))
       });
+
+      GM_xmlhttpRequest(requestOptions);
     });
   }
 
