@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IMDb Poster Helper
 // @namespace    poster-extractor.local
-// @version      1.0.1
+// @version      1.0.2
 // @description  Copy or open the poster image URL from IMDb title pages.
 // @match        https://www.imdb.com/*
 // @match        https://m.imdb.com/*
@@ -20,13 +20,17 @@
   start();
 
   function start() {
-    if (!document.body) {
-      window.setTimeout(start, 250);
-      return;
-    }
+    try {
+      if (!document.body) {
+        window.setTimeout(start, 250);
+        return;
+      }
 
-    addPanel();
-    findPoster();
+      addPanel();
+      findPoster();
+    } catch (error) {
+      showStartupError(error);
+    }
   }
 
   function addPanel() {
@@ -38,6 +42,7 @@
       + '<button data-action="copy" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Copy URL</button>'
       + '<button data-action="open" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Open Poster</button>'
       + '<button data-action="retry" style="width:100%;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Retry</button>'
+      + '<button data-action="debug" style="width:100%;margin-top:6px;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Debug</button>'
       + '<div id="imdb-poster-helper-status" style="margin-top:8px;font-size:12px;line-height:1.35;">Loading...</div>';
 
     panel.style.position = "fixed";
@@ -68,13 +73,24 @@
         state.attempts = 0;
         findPoster();
       }
+
+      if (action === "debug") {
+        showDebugInfo();
+      }
     });
 
     document.body.appendChild(panel);
   }
 
   function findPoster() {
-    var posterUrl = extractPosterUrl();
+    var posterUrl = "";
+
+    try {
+      posterUrl = extractPosterUrl();
+    } catch (error) {
+      setStatus("Error: " + error.message);
+      return;
+    }
 
     if (posterUrl) {
       state.posterUrl = posterUrl;
@@ -84,7 +100,7 @@
     }
 
     state.attempts += 1;
-    setStatus("Looking for poster...");
+    setStatus("Looking for poster... " + state.attempts + "/15");
     setButtons(false);
 
     if (state.attempts < 15) {
@@ -96,7 +112,7 @@
   }
 
   function extractPosterUrl() {
-    return cleanImageUrl(extractFromVisiblePoster() || extractFromJsonLd() || extractFromMeta());
+    return cleanImageUrl(extractFromVisiblePoster() || extractFromJsonLd() || extractFromMeta() || extractFromPageHtml());
   }
 
   function extractFromJsonLd() {
@@ -179,15 +195,17 @@
 
   function bestImageFromElement(image) {
     var srcset = image.getAttribute("srcset") || "";
-    var src = image.getAttribute("src") || "";
+    var src = image.currentSrc || image.getAttribute("src") || image.getAttribute("data-src") || "";
     var candidates;
     var lastCandidate;
     var url;
+    var srcsetUrl;
 
     if (srcset.indexOf("m.media-amazon.com/images/") !== -1) {
       candidates = srcset.split(",");
-      lastCandidate = candidates[candidates.length - 1].trim().split(/\s+/)[0];
-      url = lastCandidate || src;
+      lastCandidate = candidates[candidates.length - 1];
+      srcsetUrl = lastCandidate ? lastCandidate.replace(/^\s+|\s+$/g, "").split(/\s+/)[0] : "";
+      url = srcsetUrl || src;
     } else {
       url = src;
     }
@@ -197,6 +215,24 @@
     }
 
     return "";
+  }
+
+  function extractFromPageHtml() {
+    var html = document.documentElement.innerHTML;
+    var matches = html.match(/https:\/\/m\.media-amazon\.com\/images\/M\/[^"'\\<>\s]+?\.(jpg|jpeg|png|webp)/gi);
+    var i;
+
+    if (!matches) {
+      return "";
+    }
+
+    for (i = 0; i < matches.length; i += 1) {
+      if (matches[i].indexOf("UY") !== -1 || matches[i].indexOf("UX") !== -1 || matches[i].indexOf("_V1_") !== -1) {
+        return matches[i].replace(/\\u002F/g, "/");
+      }
+    }
+
+    return matches[0].replace(/\\u002F/g, "/");
   }
 
   function cleanImageUrl(url) {
@@ -245,5 +281,31 @@
   function showPromptFallback() {
     window.prompt("Copy poster URL:", state.posterUrl);
     setStatus("Copy manually from the popup.");
+  }
+
+  function showDebugInfo() {
+    var images = document.querySelectorAll("img");
+    var metas = document.querySelectorAll('meta[property="og:image"],meta[name="twitter:image"]');
+    var jsonScripts = document.querySelectorAll('script[type="application/ld+json"]');
+    var firstImage = images[0] ? (images[0].currentSrc || images[0].src || images[0].getAttribute("src") || "") : "";
+
+    window.prompt("Debug info:", ""
+      + "URL: " + window.location.href + "\n"
+      + "Images: " + images.length + "\n"
+      + "Meta images: " + metas.length + "\n"
+      + "JSON-LD blocks: " + jsonScripts.length + "\n"
+      + "First image: " + firstImage + "\n"
+      + "Current poster: " + state.posterUrl);
+  }
+
+  function showStartupError(error) {
+    var panel = document.getElementById("imdb-poster-helper-panel");
+
+    if (panel) {
+      setStatus("Startup error: " + error.message);
+      return;
+    }
+
+    window.alert("IMDb Poster Helper startup error: " + error.message);
   }
 }());
