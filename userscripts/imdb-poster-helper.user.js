@@ -1,11 +1,14 @@
 // ==UserScript==
 // @name         IMDb Poster Helper
 // @namespace    poster-extractor.local
-// @version      1.0.8
+// @version      1.1.0
 // @description  Copy or open the poster image URL from IMDb title pages.
 // @match        https://www.imdb.com/*
 // @match        https://m.imdb.com/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      imgbox.com
+// @connect      m.media-amazon.com
+// @connect      images-na.ssl-images-amazon.com
 // @run-at       document-end
 // ==/UserScript==
 
@@ -49,9 +52,10 @@
 
     panel.id = "imdb-poster-helper-panel";
     panel.innerHTML = ""
-      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.0.8</div>'
+      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.1.0</div>'
       + '<button data-action="copy" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Copy URL</button>'
       + '<button data-action="open" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Open Poster</button>'
+      + '<button data-action="upload" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Upload Imgbox</button>'
       + '<button data-action="retry" style="width:100%;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Retry</button>'
       + '<button data-action="debug" style="width:100%;margin-top:6px;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Debug</button>'
       + '<div id="imdb-poster-helper-status" style="margin-top:8px;font-size:12px;line-height:1.35;">Loading...</div>';
@@ -84,6 +88,10 @@
       if (action === "retry") {
         state.attempts = 0;
         findPoster();
+      }
+
+      if (action === "upload") {
+        uploadPosterUrl(event.target);
       }
 
       if (action === "debug") {
@@ -350,6 +358,7 @@
   function setButtons(enabled) {
     setButton("copy", enabled);
     setButton("open", enabled);
+    setButton("upload", enabled);
   }
 
   function setButton(action, enabled) {
@@ -388,6 +397,251 @@
       state.posterUrl = posterUrl;
       setButtons(true);
     }
+  }
+
+  function uploadPosterUrl(button) {
+    refreshPosterSelection();
+
+    if (!state.posterUrl) {
+      setStatus("No poster URL to upload.");
+      return;
+    }
+
+    button.disabled = true;
+    button.style.opacity = ".55";
+    setStatus("Uploading to Imgbox...");
+
+    uploadToImgbox(state.posterUrl, function (error, uploaded) {
+      button.disabled = false;
+      button.style.opacity = "1";
+
+      if (error) {
+        setStatus("Upload failed: " + error.message);
+        return;
+      }
+
+      copyText(uploaded.directUrl || uploaded.pageUrl);
+      setStatus("Uploaded and copied: " + shortUrl(uploaded.directUrl || uploaded.pageUrl));
+    });
+  }
+
+  function uploadToImgbox(imageUrl, done) {
+    getImgboxSession(function (sessionError, session) {
+      if (sessionError) {
+        done(sessionError);
+        return;
+      }
+
+      getImgboxToken(session, function (tokenError, token) {
+        if (tokenError) {
+          done(tokenError);
+          return;
+        }
+
+        getImageBlob(imageUrl, function (imageError, image) {
+          if (imageError) {
+            done(imageError);
+            return;
+          }
+
+          uploadImageBlob(token, image, done);
+        });
+      });
+    });
+  }
+
+  function getImgboxSession(done) {
+    gmRequest({
+      method: "GET",
+      url: "https://imgbox.com/",
+      responseType: "text"
+    }, function (error, response) {
+      var html;
+      var match;
+
+      if (error) {
+        done(error);
+        return;
+      }
+
+      html = response.responseText || "";
+      match = html.match(/name=["']authenticity_token["'][^>]+value=["']([^"']+)["']/i)
+        || html.match(/value=["']([^"']+)["'][^>]+name=["']authenticity_token["']/i)
+        || html.match(/<meta[^>]+name=["']csrf-token["'][^>]+content=["']([^"']+)["']/i);
+
+      if (!match || !match[1]) {
+        done(new Error("Could not start Imgbox session."));
+        return;
+      }
+
+      done(null, { csrfToken: decodeHtml(match[1]) });
+    });
+  }
+
+  function getImgboxToken(session, done) {
+    gmRequest({
+      method: "POST",
+      url: "https://imgbox.com/ajax/token/generate",
+      headers: {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        Origin: "https://imgbox.com",
+        Referer: "https://imgbox.com/",
+        "X-CSRF-Token": session.csrfToken,
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      responseType: "json"
+    }, function (error, response) {
+      var token;
+
+      if (error) {
+        done(error);
+        return;
+      }
+
+      token = getJsonResponse(response);
+
+      if (!token || !token.token_id || !token.token_secret) {
+        done(new Error("Could not create Imgbox upload token."));
+        return;
+      }
+
+      done(null, token);
+    });
+  }
+
+  function getImageBlob(imageUrl, done) {
+    gmRequest({
+      method: "GET",
+      url: imageUrl,
+      responseType: "blob"
+    }, function (error, response) {
+      var blob;
+      var contentType;
+      var extension;
+
+      if (error) {
+        done(error);
+        return;
+      }
+
+      blob = response.response;
+      contentType = blob && blob.type ? blob.type : "image/jpeg";
+      extension = contentType.indexOf("png") !== -1 ? "png" : contentType.indexOf("webp") !== -1 ? "webp" : "jpg";
+
+      done(null, {
+        blob: blob,
+        filename: "imdb-poster." + extension
+      });
+    });
+  }
+
+  function uploadImageBlob(token, image, done) {
+    var form = new FormData();
+
+    form.append("token_id", token.token_id);
+    form.append("token_secret", token.token_secret);
+    form.append("gallery_id", token.gallery_id || "null");
+    form.append("gallery_secret", token.gallery_secret || "null");
+    form.append("content_type", "1");
+    form.append("thumbnail_size", "350c");
+    form.append("comments_enabled", "0");
+    form.append("files[]", image.blob, image.filename);
+
+    gmRequest({
+      method: "POST",
+      url: "https://imgbox.com/upload/process",
+      headers: {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        Origin: "https://imgbox.com",
+        Referer: "https://imgbox.com/",
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      data: form,
+      responseType: "json"
+    }, function (error, response) {
+      var payload;
+      var file;
+
+      if (error) {
+        done(error);
+        return;
+      }
+
+      payload = getJsonResponse(response);
+      file = payload && payload.files && payload.files[0];
+
+      if (!file) {
+        done(new Error("Imgbox did not return an uploaded file."));
+        return;
+      }
+
+      done(null, {
+        pageUrl: absoluteImgboxUrl(file.url || file.page_url),
+        directUrl: absoluteImgboxUrl(file.original_url || file.original || file.image_url)
+      });
+    });
+  }
+
+  function gmRequest(options, done) {
+    options.onload = function (response) {
+      if (response.status >= 200 && response.status < 300) {
+        done(null, response);
+        return;
+      }
+
+      done(new Error("HTTP " + response.status));
+    };
+    options.onerror = function () {
+      done(new Error("Network request failed."));
+    };
+    options.ontimeout = function () {
+      done(new Error("Network request timed out."));
+    };
+
+    GM_xmlhttpRequest(options);
+  }
+
+  function getJsonResponse(response) {
+    if (response.response && typeof response.response === "object") {
+      return response.response;
+    }
+
+    try {
+      return JSON.parse(response.responseText || "");
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function absoluteImgboxUrl(url) {
+    if (!url) {
+      return "";
+    }
+
+    if (url.indexOf("//") === 0) {
+      return "https:" + url;
+    }
+
+    if (url.indexOf("/") === 0) {
+      return "https://imgbox.com" + url;
+    }
+
+    return url;
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+      return;
+    }
+
+    window.prompt("Copy URL:", text);
+  }
+
+  function decodeHtml(value) {
+    var textarea = document.createElement("textarea");
+    textarea.innerHTML = value;
+    return textarea.value;
   }
 
   function shortUrl(url) {
