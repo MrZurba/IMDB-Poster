@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IMDb Poster Helper
 // @namespace    poster-extractor.local
-// @version      1.0.5
+// @version      1.0.6
 // @description  Copy or open the poster image URL from IMDb title pages.
 // @match        https://www.imdb.com/*
 // @match        https://m.imdb.com/*
@@ -15,7 +15,9 @@
   var state = {
     posterUrl: "",
     firstImageUrl: "",
-    attempts: 0
+    attempts: 0,
+    panel: null,
+    status: null
   };
 
   start();
@@ -36,10 +38,18 @@
 
   function addPanel() {
     var panel = document.createElement("div");
+    var oldPanels = document.querySelectorAll("#imdb-poster-helper-panel");
+    var i;
+
+    for (i = 0; i < oldPanels.length; i += 1) {
+      if (oldPanels[i].parentNode) {
+        oldPanels[i].parentNode.removeChild(oldPanels[i]);
+      }
+    }
 
     panel.id = "imdb-poster-helper-panel";
     panel.innerHTML = ""
-      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.0.5</div>'
+      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.0.6</div>'
       + '<button data-action="copy" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Copy URL</button>'
       + '<button data-action="open" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Open Poster</button>'
       + '<button data-action="first" style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Use First Image</button>'
@@ -86,6 +96,8 @@
     });
 
     document.body.appendChild(panel);
+    state.panel = panel;
+    state.status = panel.querySelector("#imdb-poster-helper-status");
   }
 
   function findPoster() {
@@ -284,7 +296,7 @@
   }
 
   function setStatus(message) {
-    var status = document.getElementById("imdb-poster-helper-status");
+    var status = state.status;
 
     if (status) {
       status.textContent = message;
@@ -297,7 +309,7 @@
   }
 
   function setButton(action, enabled) {
-    var button = document.querySelector('#imdb-poster-helper-panel button[data-action="' + action + '"]');
+    var button = state.panel ? state.panel.querySelector('button[data-action="' + action + '"]') : null;
 
     if (button) {
       button.disabled = !enabled;
@@ -360,7 +372,7 @@
   }
 
   function showStartupError(error) {
-    var panel = document.getElementById("imdb-poster-helper-panel");
+    var panel = state.panel;
 
     if (panel) {
       setStatus("Startup error: " + error.message);
