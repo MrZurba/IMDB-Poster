@@ -15,8 +15,8 @@ This is the simplest way to use the tool without hosting a public backend.
 1. Open an IMDb title page such as `https://www.imdb.com/title/tt0111161/`.
 2. Use the small **Poster** panel at the bottom-right.
 3. Click **Copy URL** for the direct IMDb poster URL.
-4. Click **Upload Imgbox** to upload it to Imgbox and copy the hosted URL.
+4. Click **Open Poster** to open the original poster image in a new tab.
 
-The script runs on IMDb pages only. Imgbox upload uses the same guest upload flow as the Imgbox website, so it does not need an API key.
+Version `1.1.0` is a minimal compatibility build. It does not include Imgbox upload yet; use it first to confirm Violentmonkey or Tampermonkey can show the panel on IMDb.
 
-If the panel does not appear, open an IMDb title page like `https://www.imdb.com/title/tt0111161/`, click the Violentmonkey/Tampermonkey extension icon, and confirm this script is listed as running on the page. Version `1.0.4` shows the panel even while it is still looking for the poster and uses conservative JavaScript syntax for userscript parser compatibility.
+If the panel does not appear, open an IMDb title page like `https://www.imdb.com/title/tt0111161/`, click the Violentmonkey/Tampermonkey extension icon, and confirm this script is listed as running on the page.
