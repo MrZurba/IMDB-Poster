@@ -10,9 +10,9 @@ Automatic reupload is supported through Imgbox. It does not need an API key.
 
 The easiest public version is the Tampermonkey/Violentmonkey userscript:
 
-[userscripts/imdb-poster-imgbox.user.js](userscripts/imdb-poster-imgbox.user.js)
+[userscripts/imdb-poster-helper.user.js](userscripts/imdb-poster-helper.user.js)
 
-It runs directly on IMDb title pages, adds a small **Poster** panel, copies the IMDb poster URL, and can upload to Imgbox without needing your own hosted backend.
+It runs directly on IMDb title pages, adds a small **IMDb Poster** panel, copies the IMDb poster URL, and can upload to Imgbox without needing your own hosted backend.
 
 See [userscripts/README.md](userscripts/README.md) for install steps.
 
