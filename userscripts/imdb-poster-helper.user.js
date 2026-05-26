@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IMDb Poster Helper
 // @namespace    poster-extractor.local
-// @version      1.0.7
+// @version      1.0.8
 // @description  Copy or open the poster image URL from IMDb title pages.
 // @match        https://www.imdb.com/*
 // @match        https://m.imdb.com/*
@@ -49,10 +49,9 @@
 
     panel.id = "imdb-poster-helper-panel";
     panel.innerHTML = ""
-      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.0.7</div>'
+      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.0.8</div>'
       + '<button data-action="copy" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Copy URL</button>'
       + '<button data-action="open" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Open Poster</button>'
-      + '<button data-action="first" style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Use First Image</button>'
       + '<button data-action="retry" style="width:100%;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Retry</button>'
       + '<button data-action="debug" style="width:100%;margin-top:6px;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Debug</button>'
       + '<div id="imdb-poster-helper-status" style="margin-top:8px;font-size:12px;line-height:1.35;">Loading...</div>';
@@ -78,16 +77,13 @@
       }
 
       if (action === "open") {
+        refreshPosterSelection();
         window.open(state.posterUrl, "_blank", "noopener");
       }
 
       if (action === "retry") {
         state.attempts = 0;
         findPoster();
-      }
-
-      if (action === "first") {
-        useFirstImage();
       }
 
       if (action === "debug") {
@@ -277,6 +273,10 @@
     var url;
     var srcsetUrl;
 
+    if (src && src.indexOf("m.media-amazon.com/images/") !== -1) {
+      return src;
+    }
+
     if (srcset.indexOf("m.media-amazon.com/images/") !== -1) {
       candidates = srcset.split(",");
       lastCandidate = candidates[candidates.length - 1];
@@ -362,9 +362,11 @@
   }
 
   function copyPosterUrl() {
+    refreshPosterSelection();
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(state.posterUrl).then(function () {
-        setStatus("Copied.");
+        setStatus("Copied: " + shortUrl(state.posterUrl));
       }, function () {
         showPromptFallback();
       });
@@ -379,17 +381,13 @@
     setStatus("Copy manually from the popup.");
   }
 
-  function useFirstImage() {
-    var first = cleanImageUrl(extractFirstAmazonImage());
+  function refreshPosterSelection() {
+    var posterUrl = extractPosterUrl();
 
-    if (!first) {
-      setStatus("No first IMDb image found.");
-      return;
+    if (posterUrl) {
+      state.posterUrl = posterUrl;
+      setButtons(true);
     }
-
-    state.posterUrl = first;
-    setButtons(true);
-    setStatus("Using first image: " + shortUrl(first));
   }
 
   function shortUrl(url) {
