@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IMDb Poster Helper
 // @namespace    poster-extractor.local
-// @version      1.0.2
+// @version      1.0.3
 // @description  Copy or open the poster image URL from IMDb title pages.
 // @match        https://www.imdb.com/*
 // @match        https://m.imdb.com/*
@@ -185,6 +185,14 @@
     for (i = 0; i < images.length; i += 1) {
       src = bestImageFromElement(images[i]);
 
+      if (src && isLikelyPosterImage(images[i], src)) {
+        return src;
+      }
+    }
+
+    for (i = 0; i < images.length; i += 1) {
+      src = bestImageFromElement(images[i]);
+
       if (src) {
         return src;
       }
@@ -215,6 +223,26 @@
     }
 
     return "";
+  }
+
+  function isLikelyPosterImage(image, src) {
+    var alt = (image.getAttribute("alt") || "").toLowerCase();
+    var width = image.naturalWidth || image.width || 0;
+    var height = image.naturalHeight || image.height || 0;
+
+    if (src.indexOf("m.media-amazon.com/images/M/") === -1) {
+      return false;
+    }
+
+    if (alt.indexOf("poster") !== -1 || alt.indexOf("primary image") !== -1) {
+      return true;
+    }
+
+    if (height > width && height >= 250) {
+      return true;
+    }
+
+    return false;
   }
 
   function extractFromPageHtml() {
