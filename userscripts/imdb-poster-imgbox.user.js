@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IMDb Poster to Imgbox
-// @namespace    https://github.com/MrZurba/poster-extractor
-// @version      1.0.3
+// @namespace    poster-extractor.local
+// @version      1.0.4
 // @description  Extract IMDb poster URLs and optionally upload them to Imgbox.
 // @author       MrZurba
 // @match        https://www.imdb.com/title/tt*
