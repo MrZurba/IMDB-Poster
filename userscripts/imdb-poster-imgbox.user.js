@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         IMDb Poster to Imgbox
 // @namespace    https://github.com/MrZurba/poster-extractor
-// @version      1.0.0
+// @version      1.0.1
 // @description  Extract IMDb poster URLs and optionally upload them to Imgbox.
 // @author       MrZurba
-// @match        https://www.imdb.com/title/tt*/
-// @match        https://m.imdb.com/title/tt*/
+// @match        https://www.imdb.com/title/tt*
+// @match        https://m.imdb.com/title/tt*
+// @match        https://imdb.com/title/tt*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setClipboard
 // @connect      imgbox.com
@@ -19,21 +20,46 @@
 
   const state = {
     posterUrl: "",
-    title: ""
+    title: "",
+    attempts: 0
   };
 
   init();
 
   function init() {
-    const poster = extractPoster();
+    renderPanel();
+    findPosterWithRetry();
+  }
 
-    if (!poster.url) {
+  function findPosterWithRetry() {
+    updatePosterState();
+
+    if (state.posterUrl) {
+      setStatus("Poster found.");
+      setButtonsEnabled(true);
       return;
     }
 
-    state.posterUrl = poster.url;
-    state.title = poster.title || document.title.replace(/\s*-\s*IMDb\s*$/i, "");
-    renderPanel();
+    state.attempts += 1;
+    setStatus("Looking for poster...");
+    setButtonsEnabled(false);
+
+    if (state.attempts < 12) {
+      window.setTimeout(findPosterWithRetry, 750);
+      return;
+    }
+
+    setStatus("No poster found. Try Retry after the page finishes loading.");
+    setButtonsEnabled(false);
+  }
+
+  function updatePosterState() {
+    const poster = extractPoster();
+
+    if (poster.url) {
+      state.posterUrl = poster.url;
+      state.title = poster.title || document.title.replace(/\s*-\s*IMDb\s*$/i, "");
+    }
   }
 
   function extractPoster() {
@@ -91,6 +117,7 @@
       <button type="button" data-action="copy">Copy URL</button>
       <button type="button" data-action="upload">Upload Imgbox</button>
       <button type="button" data-action="open">Open</button>
+      <button type="button" data-action="retry">Retry</button>
       <div class="ipi-status" role="status"></div>
     `;
 
@@ -152,6 +179,11 @@
 
       const action = button.dataset.action;
 
+      if (action === "retry") {
+        state.attempts = 0;
+        findPosterWithRetry();
+      }
+
       if (action === "copy") {
         copyText(state.posterUrl);
         setStatus("Copied original URL.");
@@ -176,6 +208,16 @@
         }
       }
     });
+  }
+
+  function setButtonsEnabled(enabled) {
+    const buttons = document.querySelectorAll("#imdb-poster-imgbox-panel button[data-action]");
+
+    for (const button of buttons) {
+      if (button.dataset.action !== "retry") {
+        button.disabled = !enabled;
+      }
+    }
   }
 
   async function uploadToImgbox(imageUrl) {
