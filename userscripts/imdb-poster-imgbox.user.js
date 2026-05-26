@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IMDb Poster to Imgbox
 // @namespace    https://github.com/MrZurba/poster-extractor
-// @version      1.0.2
+// @version      1.0.3
 // @description  Extract IMDb poster URLs and optionally upload them to Imgbox.
 // @author       MrZurba
 // @match        https://www.imdb.com/title/tt*
@@ -18,7 +18,7 @@
 (function () {
   "use strict";
 
-  const state = {
+  var state = {
     posterUrl: "",
     title: "",
     attempts: 0
@@ -54,7 +54,7 @@
   }
 
   function updatePosterState() {
-    const poster = extractPoster();
+    var poster = extractPoster();
 
     if (poster.url) {
       state.posterUrl = poster.url;
@@ -63,14 +63,14 @@
   }
 
   function extractPoster() {
-    const jsonLdPoster = getJsonLdPoster();
+    var jsonLdPoster = getJsonLdPoster();
+    var metaPoster;
 
     if (jsonLdPoster.url) {
       return jsonLdPoster;
     }
 
-    const metaPoster = getMetaContent('meta[property="og:image"]')
-      || getMetaContent('meta[name="twitter:image"]');
+    metaPoster = getMetaContent('meta[property="og:image"]') || getMetaContent('meta[name="twitter:image"]');
 
     return {
       url: cleanImdbImageUrl(metaPoster || ""),
@@ -79,15 +79,20 @@
   }
 
   function getJsonLdPoster() {
-    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    var scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    var i;
 
-    for (const script of scripts) {
+    for (i = 0; i < scripts.length; i += 1) {
       try {
-        const data = JSON.parse(script.textContent.trim());
-        const item = Array.isArray(data) ? data.find((entry) => entry && entry.image) : data;
-        const image = item && Array.isArray(item.image) ? item.image[0] : item && item.image;
+        var data = JSON.parse(scripts[i].textContent.trim());
+        var item = findImageItem(data);
+        var image = "";
 
-        if (typeof image === "string") {
+        if (item && item.image) {
+          image = Array.isArray(item.image) ? item.image[0] : item.image;
+        }
+
+        if (typeof image === "string" && image) {
           return {
             url: cleanImdbImageUrl(image),
             title: typeof item.name === "string" ? item.name : ""
@@ -101,8 +106,24 @@
     return { url: "", title: "" };
   }
 
+  function findImageItem(data) {
+    var i;
+
+    if (!Array.isArray(data)) {
+      return data;
+    }
+
+    for (i = 0; i < data.length; i += 1) {
+      if (data[i] && data[i].image) {
+        return data[i];
+      }
+    }
+
+    return null;
+  }
+
   function getMetaContent(selector) {
-    const element = document.querySelector(selector);
+    var element = document.querySelector(selector);
     return element ? element.content : "";
   }
 
@@ -111,74 +132,39 @@
   }
 
   function renderPanel() {
-    const panel = document.createElement("aside");
+    var panel = document.createElement("aside");
+    var style = document.createElement("style");
+
     panel.id = "imdb-poster-imgbox-panel";
-    panel.innerHTML = `
-      <div class="ipi-title">Poster</div>
-      <button type="button" data-action="copy">Copy URL</button>
-      <button type="button" data-action="upload">Upload Imgbox</button>
-      <button type="button" data-action="open">Open</button>
-      <button type="button" data-action="retry">Retry</button>
-      <div class="ipi-status" role="status"></div>
-    `;
+    panel.innerHTML = ""
+      + '<div class="ipi-title">Poster</div>'
+      + '<button type="button" data-action="copy">Copy URL</button>'
+      + '<button type="button" data-action="upload">Upload Imgbox</button>'
+      + '<button type="button" data-action="open">Open</button>'
+      + '<button type="button" data-action="retry">Retry</button>'
+      + '<div class="ipi-status" role="status"></div>';
 
-    const style = document.createElement("style");
-    style.textContent = `
-      #imdb-poster-imgbox-panel {
-        position: fixed;
-        right: 18px;
-        bottom: 18px;
-        z-index: 999999;
-        display: grid;
-        gap: 8px;
-        width: 176px;
-        border: 1px solid rgba(255,255,255,0.18);
-        border-radius: 8px;
-        background: #161616;
-        box-shadow: 0 16px 46px rgba(0,0,0,0.45);
-        color: #fff;
-        font: 13px/1.35 Arial, sans-serif;
-        padding: 12px;
-      }
-      #imdb-poster-imgbox-panel .ipi-title {
-        font-weight: 800;
-      }
-      #imdb-poster-imgbox-panel button {
-        min-height: 34px;
-        border: 0;
-        border-radius: 6px;
-        background: #f5c518;
-        color: #111;
-        cursor: pointer;
-        font: 700 13px/1 Arial, sans-serif;
-      }
-      #imdb-poster-imgbox-panel button:hover {
-        background: #ddb00f;
-      }
-      #imdb-poster-imgbox-panel button:disabled {
-        cursor: wait;
-        opacity: 0.65;
-      }
-      #imdb-poster-imgbox-panel .ipi-status {
-        min-height: 18px;
-        color: #d7d7d7;
-        overflow-wrap: anywhere;
-      }
-      #imdb-poster-imgbox-panel .ipi-status a {
-        color: #f5c518;
-      }
-    `;
+    style.textContent = ""
+      + "#imdb-poster-imgbox-panel{position:fixed;right:18px;bottom:18px;z-index:2147483647;display:grid;gap:8px;width:176px;border:1px solid rgba(255,255,255,.18);border-radius:8px;background:#161616;box-shadow:0 16px 46px rgba(0,0,0,.45);color:#fff;font:13px/1.35 Arial,sans-serif;padding:12px;}"
+      + "#imdb-poster-imgbox-panel .ipi-title{font-weight:800;}"
+      + "#imdb-poster-imgbox-panel button{min-height:34px;border:0;border-radius:6px;background:#f5c518;color:#111;cursor:pointer;font:700 13px/1 Arial,sans-serif;}"
+      + "#imdb-poster-imgbox-panel button:hover{background:#ddb00f;}"
+      + "#imdb-poster-imgbox-panel button:disabled{cursor:wait;opacity:.65;}"
+      + "#imdb-poster-imgbox-panel .ipi-status{min-height:18px;color:#d7d7d7;overflow-wrap:anywhere;}"
+      + "#imdb-poster-imgbox-panel .ipi-status a{color:#f5c518;}";
 
-    document.documentElement.append(style, panel);
+    document.documentElement.appendChild(style);
+    document.documentElement.appendChild(panel);
 
-    panel.addEventListener("click", async (event) => {
-      const button = event.target.closest("button[data-action]");
+    panel.addEventListener("click", function (event) {
+      var button = closestButton(event.target);
+      var action;
 
       if (!button) {
         return;
       }
 
-      const action = button.dataset.action;
+      action = button.getAttribute("data-action");
 
       if (action === "retry") {
         state.attempts = 0;
@@ -197,90 +183,143 @@
       if (action === "upload") {
         button.disabled = true;
         setStatus("Uploading...");
-
-        try {
-          const uploaded = await uploadToImgbox(state.posterUrl);
-          copyText(uploaded.directUrl || uploaded.pageUrl);
-          setStatus(`Uploaded: <a href="${escapeAttribute(uploaded.pageUrl)}" target="_blank" rel="noopener">Imgbox</a>`);
-        } catch (error) {
-          setStatus(error.message || "Upload failed.");
-        } finally {
+        uploadToImgbox(state.posterUrl, function (error, uploaded) {
           button.disabled = false;
-        }
+
+          if (error) {
+            setStatus(error.message || "Upload failed.");
+            return;
+          }
+
+          copyText(uploaded.directUrl || uploaded.pageUrl);
+          setStatus('Uploaded: <a href="' + escapeAttribute(uploaded.pageUrl) + '" target="_blank" rel="noopener">Imgbox</a>');
+        });
       }
     });
+  }
+
+  function closestButton(element) {
+    while (element && element !== document) {
+      if (element.tagName && element.tagName.toLowerCase() === "button" && element.getAttribute("data-action")) {
+        return element;
+      }
+
+      element = element.parentNode;
+    }
+
+    return null;
   }
 
   function setButtonsEnabled(enabled) {
-    const buttons = document.querySelectorAll("#imdb-poster-imgbox-panel button[data-action]");
+    var buttons = document.querySelectorAll("#imdb-poster-imgbox-panel button[data-action]");
+    var i;
 
-    for (const button of buttons) {
-      if (button.dataset.action !== "retry") {
-        button.disabled = !enabled;
+    for (i = 0; i < buttons.length; i += 1) {
+      if (buttons[i].getAttribute("data-action") !== "retry") {
+        buttons[i].disabled = !enabled;
       }
     }
   }
 
-  async function uploadToImgbox(imageUrl) {
-    const session = await getImgboxSession();
-    const token = await getImgboxToken(session);
-    const image = await getImageBlob(imageUrl);
-    const form = new FormData();
+  function uploadToImgbox(imageUrl, done) {
+    getImgboxSession(function (sessionError, session) {
+      if (sessionError) {
+        done(sessionError);
+        return;
+      }
 
-    form.set("token_id", token.token_id);
-    form.set("token_secret", token.token_secret);
-    form.set("gallery_id", token.gallery_id || "null");
-    form.set("gallery_secret", token.gallery_secret || "null");
-    form.set("content_type", "1");
-    form.set("thumbnail_size", "350c");
-    form.set("comments_enabled", "0");
-    form.append("files[]", image.blob, image.filename);
+      getImgboxToken(session, function (tokenError, token) {
+        if (tokenError) {
+          done(tokenError);
+          return;
+        }
 
-    const response = await gmRequest({
-      method: "POST",
-      url: "https://imgbox.com/upload/process",
-      headers: {
-        Accept: "application/json, text/javascript, */*; q=0.01",
-        Origin: "https://imgbox.com",
-        Referer: "https://imgbox.com/",
-        "X-Requested-With": "XMLHttpRequest"
-      },
-      data: form,
-      responseType: "json"
+        getImageBlob(imageUrl, function (imageError, image) {
+          var form;
+
+          if (imageError) {
+            done(imageError);
+            return;
+          }
+
+          form = new FormData();
+          form.set("token_id", token.token_id);
+          form.set("token_secret", token.token_secret);
+          form.set("gallery_id", token.gallery_id || "null");
+          form.set("gallery_secret", token.gallery_secret || "null");
+          form.set("content_type", "1");
+          form.set("thumbnail_size", "350c");
+          form.set("comments_enabled", "0");
+          form.append("files[]", image.blob, image.filename);
+
+          gmRequest({
+            method: "POST",
+            url: "https://imgbox.com/upload/process",
+            headers: {
+              Accept: "application/json, text/javascript, */*; q=0.01",
+              Origin: "https://imgbox.com",
+              Referer: "https://imgbox.com/",
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            data: form,
+            responseType: "json"
+          }, function (uploadError, response) {
+            var file;
+
+            if (uploadError) {
+              done(uploadError);
+              return;
+            }
+
+            file = response.response && response.response.files && response.response.files[0];
+
+            if (!file) {
+              done(new Error("Imgbox did not return an uploaded file."));
+              return;
+            }
+
+            done(null, {
+              pageUrl: absoluteImgboxUrl(file.url || file.page_url),
+              directUrl: absoluteImgboxUrl(file.original_url || file.original)
+            });
+          });
+        });
+      });
     });
-    const file = response.response && response.response.files && response.response.files[0];
-
-    if (!file) {
-      throw new Error("Imgbox did not return an uploaded file.");
-    }
-
-    return {
-      pageUrl: absoluteImgboxUrl(file.url || file.page_url),
-      directUrl: absoluteImgboxUrl(file.original_url || file.original)
-    };
   }
 
-  async function getImgboxSession() {
-    const response = await gmRequest({
+  function getImgboxSession(done) {
+    gmRequest({
       method: "GET",
       url: "https://imgbox.com/",
       responseType: "text"
+    }, function (error, response) {
+      var html;
+      var tokenMatch;
+      var csrfToken;
+
+      if (error) {
+        done(error);
+        return;
+      }
+
+      html = response.responseText || "";
+      tokenMatch = html.match(/name=["']authenticity_token["'][^>]+value=["']([^"']+)["']/i)
+        || html.match(/value=["']([^"']+)["'][^>]+name=["']authenticity_token["']/i)
+        || html.match(/<meta[^>]+name=["']csrf-token["'][^>]+content=["']([^"']+)["']/i);
+      csrfToken = tokenMatch && tokenMatch[1];
+
+      if (!csrfToken) {
+        done(new Error("Could not start an Imgbox session."));
+        return;
+      }
+
+      done(null, { csrfToken: decodeHtml(csrfToken) });
     });
-    const html = response.responseText || "";
-    const tokenMatch = html.match(/name=["']authenticity_token["'][^>]+value=["']([^"']+)["']/i)
-      || html.match(/value=["']([^"']+)["'][^>]+name=["']authenticity_token["']/i)
-      || html.match(/<meta[^>]+name=["']csrf-token["'][^>]+content=["']([^"']+)["']/i);
-    const csrfToken = tokenMatch && tokenMatch[1];
-
-    if (!csrfToken) {
-      throw new Error("Could not start an Imgbox session.");
-    }
-
-    return { csrfToken: decodeHtml(csrfToken) };
   }
 
-  async function getImgboxToken(session) {
-    const response = await gmRequest({
+  function getImgboxToken(session, done) {
+    gmRequest({
       method: "POST",
       url: "https://imgbox.com/ajax/token/generate",
       headers: {
@@ -291,58 +330,76 @@
         "X-Requested-With": "XMLHttpRequest"
       },
       responseType: "json"
+    }, function (error, response) {
+      var token;
+
+      if (error) {
+        done(error);
+        return;
+      }
+
+      token = response.response;
+
+      if (!token || !token.token_id || !token.token_secret) {
+        done(new Error("Could not create an Imgbox upload token."));
+        return;
+      }
+
+      done(null, token);
     });
-    const token = response.response;
-
-    if (!token || !token.token_id || !token.token_secret) {
-      throw new Error("Could not create an Imgbox upload token.");
-    }
-
-    return token;
   }
 
-  async function getImageBlob(imageUrl) {
-    const response = await gmRequest({
+  function getImageBlob(imageUrl, done) {
+    gmRequest({
       method: "GET",
       url: imageUrl,
       responseType: "blob"
-    });
-    const contentType = response.response && response.response.type ? response.response.type : "image/jpeg";
-    const extension = contentType.includes("png") ? "png" : contentType.includes("gif") ? "gif" : "jpg";
+    }, function (error, response) {
+      var contentType;
+      var extension;
 
-    return {
-      blob: response.response,
-      filename: filenameFromTitle(state.title, extension)
-    };
+      if (error) {
+        done(error);
+        return;
+      }
+
+      contentType = response.response && response.response.type ? response.response.type : "image/jpeg";
+      extension = contentType.indexOf("png") !== -1 ? "png" : contentType.indexOf("gif") !== -1 ? "gif" : "jpg";
+
+      done(null, {
+        blob: response.response,
+        filename: filenameFromTitle(state.title, extension)
+      });
+    });
   }
 
-  function gmRequest(options) {
-    return new Promise((resolve, reject) => {
-      const requestOptions = Object.assign({}, options, {
-        onload: (response) => {
-          if (response.status >= 200 && response.status < 300) {
-            resolve(response);
-            return;
-          }
+  function gmRequest(options, done) {
+    options.onload = function (response) {
+      if (response.status >= 200 && response.status < 300) {
+        done(null, response);
+        return;
+      }
 
-          reject(new Error(`Request failed with HTTP ${response.status}.`));
-        },
-        onerror: () => reject(new Error("Network request failed.")),
-        ontimeout: () => reject(new Error("Network request timed out."))
-      });
+      done(new Error("Request failed with HTTP " + response.status + "."));
+    };
+    options.onerror = function () {
+      done(new Error("Network request failed."));
+    };
+    options.ontimeout = function () {
+      done(new Error("Network request timed out."));
+    };
 
-      GM_xmlhttpRequest(requestOptions);
-    });
+    GM_xmlhttpRequest(options);
   }
 
   function filenameFromTitle(title, extension) {
-    const cleanTitle = (title || "imdb-poster")
+    var cleanTitle = (title || "imdb-poster")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 80);
 
-    return `${cleanTitle || "imdb-poster"}.${extension}`;
+    return (cleanTitle || "imdb-poster") + "." + extension;
   }
 
   function absoluteImgboxUrl(url) {
@@ -350,12 +407,12 @@
       return "";
     }
 
-    if (url.startsWith("//")) {
-      return `https:${url}`;
+    if (url.indexOf("//") === 0) {
+      return "https:" + url;
     }
 
-    if (url.startsWith("/")) {
-      return `https://imgbox.com${url}`;
+    if (url.indexOf("/") === 0) {
+      return "https://imgbox.com" + url;
     }
 
     return url;
@@ -371,7 +428,7 @@
   }
 
   function setStatus(message) {
-    const status = document.querySelector("#imdb-poster-imgbox-panel .ipi-status");
+    var status = document.querySelector("#imdb-poster-imgbox-panel .ipi-status");
 
     if (status) {
       status.innerHTML = message;
@@ -379,7 +436,7 @@
   }
 
   function decodeHtml(value) {
-    const textarea = document.createElement("textarea");
+    var textarea = document.createElement("textarea");
     textarea.innerHTML = value;
     return textarea.value;
   }
@@ -387,4 +444,4 @@
   function escapeAttribute(value) {
     return value.replace(/"/g, "&quot;");
   }
-})();
+}());
