@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         IMDb Poster Helper
 // @namespace    poster-extractor.local
-// @version      1.1.0
+// @version      1.1.1
 // @description  Copy or open the poster image URL from IMDb title pages.
 // @match        https://www.imdb.com/*
 // @match        https://m.imdb.com/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setClipboard
 // @connect      imgbox.com
 // @connect      m.media-amazon.com
 // @connect      images-na.ssl-images-amazon.com
@@ -20,7 +21,8 @@
     firstImageUrl: "",
     attempts: 0,
     panel: null,
-    status: null
+    status: null,
+    output: null
   };
 
   start();
@@ -52,12 +54,13 @@
 
     panel.id = "imdb-poster-helper-panel";
     panel.innerHTML = ""
-      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.1.0</div>'
+      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.1.1</div>'
       + '<button data-action="copy" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Copy URL</button>'
       + '<button data-action="open" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Open Poster</button>'
       + '<button data-action="upload" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Upload Imgbox</button>'
       + '<button data-action="retry" style="width:100%;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Retry</button>'
       + '<button data-action="debug" style="width:100%;margin-top:6px;padding:8px;border:0;border-radius:5px;background:#fff;color:#111;font-weight:bold;cursor:pointer;">Debug</button>'
+      + '<textarea id="imdb-poster-helper-output" readonly style="display:none;width:100%;height:72px;margin-top:8px;padding:6px;box-sizing:border-box;border:2px solid #111;border-radius:5px;background:#fff;color:#111;font:11px Arial,sans-serif;resize:vertical;"></textarea>'
       + '<div id="imdb-poster-helper-status" style="margin-top:8px;font-size:12px;line-height:1.35;">Loading...</div>';
 
     panel.style.position = "fixed";
@@ -102,6 +105,7 @@
     document.body.appendChild(panel);
     state.panel = panel;
     state.status = panel.querySelector("#imdb-poster-helper-status");
+    state.output = panel.querySelector("#imdb-poster-helper-output");
   }
 
   function findPoster() {
@@ -372,17 +376,13 @@
 
   function copyPosterUrl() {
     refreshPosterSelection();
+    setOutput(state.posterUrl);
 
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(state.posterUrl).then(function () {
-        setStatus("Copied: " + shortUrl(state.posterUrl));
-      }, function () {
-        showPromptFallback();
-      });
-      return;
+    if (copyText(state.posterUrl)) {
+      setStatus("Copied: " + shortUrl(state.posterUrl));
+    } else {
+      setStatus("Copy manually from the box below.");
     }
-
-    showPromptFallback();
   }
 
   function showPromptFallback() {
@@ -412,6 +412,8 @@
     setStatus("Uploading to Imgbox...");
 
     uploadToImgbox(state.posterUrl, function (error, uploaded) {
+      var uploadedUrl;
+
       button.disabled = false;
       button.style.opacity = "1";
 
@@ -420,8 +422,14 @@
         return;
       }
 
-      copyText(uploaded.directUrl || uploaded.pageUrl);
-      setStatus("Uploaded and copied: " + shortUrl(uploaded.directUrl || uploaded.pageUrl));
+      uploadedUrl = uploaded.directUrl || uploaded.pageUrl;
+      setOutput(uploadedUrl);
+
+      if (copyText(uploadedUrl)) {
+        setStatus("Uploaded and copied. Full URL is below.");
+      } else {
+        setStatus("Uploaded. Copy the full URL below.");
+      }
     });
   }
 
@@ -630,12 +638,29 @@
   }
 
   function copyText(text) {
+    if (typeof GM_setClipboard === "function") {
+      GM_setClipboard(text, "text");
+      return true;
+    }
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text);
-      return;
+      return true;
     }
 
     window.prompt("Copy URL:", text);
+    return false;
+  }
+
+  function setOutput(url) {
+    if (!state.output || !url) {
+      return;
+    }
+
+    state.output.value = url;
+    state.output.style.display = "block";
+    state.output.focus();
+    state.output.select();
   }
 
   function decodeHtml(value) {
