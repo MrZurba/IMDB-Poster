@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         IMDb Poster Helper
 // @namespace    poster-extractor.local
-// @version      1.1.1
+// @version      1.1.2
 // @description  Copy or open the poster image URL from IMDb title pages.
 // @match        https://www.imdb.com/*
 // @match        https://m.imdb.com/*
+// @downloadURL  https://raw.githubusercontent.com/MrZurba/IMDB-Poster/main/userscripts/imdb-poster-helper.user.js
+// @updateURL    https://raw.githubusercontent.com/MrZurba/IMDB-Poster/main/userscripts/imdb-poster-helper.user.js
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setClipboard
 // @connect      imgbox.com
@@ -54,7 +56,7 @@
 
     panel.id = "imdb-poster-helper-panel";
     panel.innerHTML = ""
-      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.1.1</div>'
+      + '<div style="font-weight:bold;margin-bottom:8px;">IMDb Poster v1.1.2</div>'
       + '<button data-action="copy" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Copy URL</button>'
       + '<button data-action="open" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Open Poster</button>'
       + '<button data-action="upload" disabled style="width:100%;margin-bottom:6px;padding:8px;border:0;border-radius:5px;background:#111;color:#f5c518;font-weight:bold;cursor:pointer;">Upload Imgbox</button>'
@@ -426,9 +428,9 @@
       setOutput(uploadedUrl);
 
       if (copyText(uploadedUrl)) {
-        setStatus("Uploaded and copied. Full URL is below.");
+        setStatus("Uploaded and copied. Full URL below:\n" + uploadedUrl);
       } else {
-        setStatus("Uploaded. Copy the full URL below.");
+        setStatus("Uploaded. Copy the full URL below:\n" + uploadedUrl);
       }
     });
   }
